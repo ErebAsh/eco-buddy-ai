@@ -9,6 +9,12 @@ class GDPRComplianceChecker:
 
     # Maximum retention period in days before anonymization is mandated
     MAX_RETENTION_DAYS = 730 # 2 years
+    
+    def enforce_retention(self, db_path: str = "eco_buddy.db") -> None:
+        """Triggers the automated retention engine to resolve compliance violations."""
+        from src.data.retention_engine import RetentionEnforcer
+        enforcer = RetentionEnforcer(db_path)
+        enforcer.run_daily_job()
 
     def __init__(self, users_data: List[Dict[str, Any]]):
         self.users = users_data

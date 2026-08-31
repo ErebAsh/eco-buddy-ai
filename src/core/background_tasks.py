@@ -764,3 +764,21 @@ def render_task_progress(
         return False, None
 
     return False, None
+
+def schedule_daily_retention_job(store: Optional[BackgroundTaskStore] = None) -> BackgroundTask:
+    """Schedule the daily data retention enforcement job."""
+    from src.data.retention_engine import RetentionEnforcer
+    import datetime
+    
+    def run_retention() -> None:
+        enforcer = RetentionEnforcer()
+        enforcer.run_daily_job()
+        
+    return submit_background_task(
+        task_key="daily_data_retention",
+        func=run_retention,
+        task_name="Daily Data Retention Enforcer",
+        task_type="maintenance",
+        idempotency_key=f"retention_{datetime.datetime.now(datetime.timezone.utc).date().isoformat()}",
+        store=store
+    )
