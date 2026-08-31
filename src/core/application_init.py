@@ -32,3 +32,12 @@ __all__ = [
     'measure_load_time',
     'retry_on_failure'
 ]
+
+@startup_phase("feature_flags")
+@background_load(priority=LoadPriority.HIGH)
+@retry_on_failure(retries=3, delay=1.0)
+def preload_feature_flags():
+    """Ensure active flags are loaded into cache on startup."""
+    from src.core.feature_flags import FeatureFlagStore
+    # List flags which will query DB and could be cached
+    FeatureFlagStore.list_flags()

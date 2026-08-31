@@ -239,6 +239,37 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "lifetime_spent": "REAL",
         "updated_at": "TIMESTAMP",
     },
+    "feature_flags": {
+        "name": "TEXT",
+        "enabled": "BOOLEAN",
+        "rollout_percentage": "REAL",
+        "target_rules": "TEXT",
+        "variants": "TEXT",
+        "created_at": "TIMESTAMP",
+        "updated_at": "TIMESTAMP",
+    },
+    "flag_overrides": {
+        "flag_name": "TEXT",
+        "user_id": "TEXT",
+        "enabled": "BOOLEAN",
+        "variant": "TEXT",
+        "created_at": "TIMESTAMP",
+    },
+    "experiment_assignments": {
+        "flag_name": "TEXT",
+        "user_id": "TEXT",
+        "variant": "TEXT",
+        "assigned_at": "TIMESTAMP",
+    },
+    "experiment_metrics": {
+        "id": "INTEGER",
+        "flag_name": "TEXT",
+        "user_id": "TEXT",
+        "variant": "TEXT",
+        "metric_name": "TEXT",
+        "metric_value": "REAL",
+        "recorded_at": "TIMESTAMP",
+    },
 }
 
 EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
@@ -277,6 +308,10 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
     "idx_trades_buyer": (
         "credit_trades",
         ("buyer_id",),
+    ),
+    "idx_experiment_metrics_flag": (
+        "experiment_metrics",
+        ("flag_name", "variant"),
     ),
 }
 

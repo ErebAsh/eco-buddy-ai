@@ -20,6 +20,7 @@ from src.core.database import get_assessments, get_active_goal
 from src.utils.goals import evaluate_progress
 from src.core.api_auth import authenticate_request, generate_api_key, init_api_keys_db
 from src.core.rate_limiter import CompositeRateLimiter
+from src.core.feature_flags import feature_flag, FeatureFlagStore, FeatureFlag
 
 # ---------------------------------------------------------------------------
 # Version prefix — single source of truth for the API version segment.
@@ -255,6 +256,82 @@ SWAGGER_UI_HTML = f"""<!DOCTYPE html>
 
 
 # ---------------------------------------------------------------------------
+# Decorated Handlers for Experimental Features
+# ---------------------------------------------------------------------------
+
+def _rainwater_tank_fallback(body: dict, user_id: str, **kwargs) -> tuple:
+    return (
+        404,
+        {"error": "Feature Disabled", "message": "The rainwater calculator is currently disabled or not available for your account."},
+        "application/json",
+    )
+
+@feature_flag("experimental_rainwater_calc", fallback_func=_rainwater_tank_fallback)
+def _handle_rainwater_tank(body: dict, user_id: str, **kwargs) -> tuple:
+    try:
+        from src.environment.rainwater import (
+            monthly_harvest,
+            simulate_storage,
+            recommend_tank_size,
+            savings_estimate,
+            co2_savings,
+            annual_harvest_potential,
+            get_climate_profile,
+            CLIMATE_ZONES
+        )
+
+        roof_area = float(body.get("roof_area_m2", 100.0))
+        roof_material = str(body.get("roof_material", "Metal / corrugated sheet"))
+        climate_zone = str(body.get("climate_zone", "Temperate maritime"))
+        tank_litres = float(body.get("tank_litres", 3000.0))
+
+        monthly_rainfall = body.get("monthly_rainfall_mm")
+        if not monthly_rainfall:
+            monthly_rainfall = get_climate_profile(climate_zone)
+
+        monthly_demand = body.get("monthly_demand_l")
+        if not monthly_demand:
+            monthly_demand = [3500.0] * 12
+
+        harvest_series = monthly_harvest(roof_area, monthly_rainfall, roof_material)
+        annual_harvest = annual_harvest_potential(roof_area, sum(monthly_rainfall), roof_material)
+        simulation = simulate_storage(tank_litres, harvest_series, monthly_demand)
+        recommended = recommend_tank_size(harvest_series, monthly_demand)
+        payback = savings_estimate(simulation["total_supplied_l"], tank_litres=tank_litres)
+        carbon_avoided = co2_savings(simulation["total_supplied_l"])
+
+        # Check if A/B test variant is assigned via the decorator
+        variant = kwargs.get("_flag_variant")
+        if variant == "detailed_report":
+            # Add extra debug data or detailed report for this variant
+            simulation["_experimental_variant"] = variant
+
+        return (
+            200,
+            {
+                "success": True,
+                "data": {
+                    "roof_area_m2": roof_area,
+                    "roof_material": roof_material,
+                    "climate_zone": climate_zone,
+                    "monthly_harvest_l": harvest_series,
+                    "annual_harvest_litres": annual_harvest,
+                    "simulation": simulation,
+                    "optimal_tank_recommendation": recommended,
+                    "financial_payback": payback,
+                    "carbon_avoided": carbon_avoided
+                }
+            },
+            "application/json",
+        )
+    except Exception as exc:
+        return (
+            400,
+            {"error": "Calculation Error", "message": str(exc)},
+            "application/json",
+        )
+
+# ---------------------------------------------------------------------------
 # Request dispatcher
 # ---------------------------------------------------------------------------
 
@@ -481,62 +558,44 @@ def process_api_request(
                 {"error": "Bad Request", "message": "JSON body is required."},
                 "application/json",
             )
-        try:
-            from src.environment.rainwater import (
-                monthly_harvest,
-                simulate_storage,
-                recommend_tank_size,
-                savings_estimate,
-                co2_savings,
-                annual_harvest_potential,
-                get_climate_profile,
-                CLIMATE_ZONES
-            )
+        return _handle_rainwater_tank(body=body, user_id=user_id)
 
-            roof_area = float(body.get("roof_area_m2", 100.0))
-            roof_material = str(body.get("roof_material", "Metal / corrugated sheet"))
-            climate_zone = str(body.get("climate_zone", "Temperate maritime"))
-            tank_litres = float(body.get("tank_litres", 3000.0))
-
-            monthly_rainfall = body.get("monthly_rainfall_mm")
-            if not monthly_rainfall:
-                monthly_rainfall = get_climate_profile(climate_zone)
-
-            monthly_demand = body.get("monthly_demand_l")
-            if not monthly_demand:
-                monthly_demand = [3500.0] * 12
-
-            harvest_series = monthly_harvest(roof_area, monthly_rainfall, roof_material)
-            annual_harvest = annual_harvest_potential(roof_area, sum(monthly_rainfall), roof_material)
-            simulation = simulate_storage(tank_litres, harvest_series, monthly_demand)
-            recommended = recommend_tank_size(harvest_series, monthly_demand)
-            payback = savings_estimate(simulation["total_supplied_l"], tank_litres=tank_litres)
-            carbon_avoided = co2_savings(simulation["total_supplied_l"])
-
-            return (
-                200,
-                {
-                    "success": True,
-                    "data": {
-                        "roof_area_m2": roof_area,
-                        "roof_material": roof_material,
-                        "climate_zone": climate_zone,
-                        "monthly_harvest_l": harvest_series,
-                        "annual_harvest_litres": annual_harvest,
-                        "simulation": simulation,
-                        "optimal_tank_recommendation": recommended,
-                        "financial_payback": payback,
-                        "carbon_avoided": carbon_avoided
-                    }
-                },
-                "application/json",
-            )
-        except Exception as exc:
-            return (
-                400,
-                {"error": "Calculation Error", "message": str(exc)},
-                "application/json",
-            )
+    # ------------------------------------------------------------------ #
+    # Admin Flag Endpoints
+    # ------------------------------------------------------------------ #
+    if path == _route("/admin/flags"):
+        if method == "GET":
+            flags = FeatureFlagStore.list_flags()
+            return 200, {"success": True, "data": flags}, "application/json"
+        
+        if method == "POST":
+            if not body or "name" not in body:
+                return 400, {"error": "Bad Request", "message": "Missing flag name"}, "application/json"
+            flag = FeatureFlag.from_dict(body)
+            FeatureFlagStore.upsert_flag(flag)
+            return 201, {"success": True, "message": f"Flag {flag.name} created/updated."}, "application/json"
+            
+    if path.startswith(_route("/admin/flags/")):
+        flag_name = path.split("/")[-1]
+        if method == "GET":
+            flag = FeatureFlagStore.get_flag(flag_name)
+            if not flag:
+                return 404, {"error": "Not Found", "message": "Flag not found"}, "application/json"
+            return 200, {"success": True, "data": flag}, "application/json"
+            
+        if method == "PUT":
+            if not body:
+                return 400, {"error": "Bad Request", "message": "Missing body"}, "application/json"
+            body["name"] = flag_name
+            flag = FeatureFlag.from_dict(body)
+            FeatureFlagStore.upsert_flag(flag)
+            return 200, {"success": True, "message": f"Flag {flag.name} updated."}, "application/json"
+            
+        if method == "DELETE":
+            deleted = FeatureFlagStore.delete_flag(flag_name)
+            if not deleted:
+                return 404, {"error": "Not Found", "message": "Flag not found"}, "application/json"
+            return 200, {"success": True, "message": f"Flag {flag_name} deleted."}, "application/json"
 
 
     return (

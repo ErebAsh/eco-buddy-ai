@@ -20,6 +20,7 @@ CACHE_CATEGORY_API = "api"
 CACHE_CATEGORY_COMPUTED = "computed"
 CACHE_CATEGORY_STATIC = "static"
 CACHE_CATEGORY_SESSION = "session"
+CACHE_CATEGORY_FEATURE_FLAGS = "feature_flags"
 
 # Default max cache entries (None = unlimited)
 DEFAULT_MAX_ENTRIES = None
@@ -56,5 +57,11 @@ CACHE_CATEGORIES = {
         "stale_ttl": 0,
         "max_entries": DEFAULT_MAX_ENTRIES,
         "description": "Session-scoped data - per-user, per-session",
+    },
+    CACHE_CATEGORY_FEATURE_FLAGS: {
+        "ttl": 300,
+        "stale_ttl": 60,
+        "max_entries": 100,
+        "description": "Feature flag states - frequent reads, background refresh",
     },
 }
