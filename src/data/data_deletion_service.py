@@ -26,23 +26,17 @@ class DataDeletionService:
 
     def execute_hard_delete(self, user_id: str) -> bool:
         """
-        Permanently deletes all traces of the user from the src.core.database.
-        WARNING: This breaks statistical continuity.
+        Triggers a soft delete (30-day cool-down) for the user.
         """
-        self.logger.info(f"Initiating HARD DELETE for user {user_id}")
-        
-        queries = [
-            ("DELETE FROM footprints WHERE user_id = ?", (user_id,)),
-            ("DELETE FROM preferences WHERE user_id = ?", (user_id,)),
-            ("DELETE FROM users WHERE user_id = ?", (user_id,)),
-        ]
+        self.logger.info(f"Initiating SOFT DELETE for user {user_id}")
         
         try:
-            for q, p in queries:
-                self._execute_query(q, p)
+            from src.data.retention_engine import SoftDeleteManager
+            manager = SoftDeleteManager(self.db_path)
+            manager.soft_delete_user(user_id)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to hard delete user {user_id}: {e}")
+            self.logger.error(f"Failed to soft delete user {user_id}: {e}")
             return False
 
     def execute_anonymization(self, user_id: str) -> str:

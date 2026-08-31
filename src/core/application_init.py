@@ -14,6 +14,11 @@ from .startup_decorators import (
     retry_on_failure
 )
 
+from .event_subscribers import register_all_subscribers
+
+# Register event subscribers on application init
+register_all_subscribers()
+
 __all__ = [
     'StartupOptimizer',
     'LoadPriority',
@@ -40,4 +45,4 @@ def preload_feature_flags():
     """Ensure active flags are loaded into cache on startup."""
     from src.core.feature_flags import FeatureFlagStore
     # List flags which will query DB and could be cached
-    FeatureFlagStore.list_flags()
+    FeatureFlagStore.list_flags()

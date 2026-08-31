@@ -10,7 +10,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 
-from database import DB_NAME
+from src.core.database import DB_NAME
 from src.decision_engine.models import ScenarioInputs, TransportInputs, EnergyInputs, FoodInputs, WasteInputs, WaterInputs
 
 def load_baseline_from_user(user_id: int) -> ScenarioInputs:

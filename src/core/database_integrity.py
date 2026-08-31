@@ -27,6 +27,7 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "password_hash": "TEXT",
         "anonymous_leaderboard": "INTEGER",
         "created_at": "TIMESTAMP",
+        "deleted_at": "TIMESTAMP",
     },
     "assessments": {
         "id": "INTEGER",
@@ -42,6 +43,7 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "eco_score": "INTEGER",
         "trip_id": "TEXT",
         "factor_version": "TEXT",
+        "deleted_at": "TIMESTAMP",
     },
     "assessment_drafts": {
         "user_id": "INTEGER",
@@ -239,6 +241,7 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "lifetime_spent": "REAL",
         "updated_at": "TIMESTAMP",
     },
+<<<<<<< HEAD
     "feature_flags": {
         "name": "TEXT",
         "enabled": "BOOLEAN",
@@ -269,6 +272,75 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "metric_name": "TEXT",
         "metric_value": "REAL",
         "recorded_at": "TIMESTAMP",
+=======
+    "api_usage_records": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "endpoint": "TEXT",
+        "method": "TEXT",
+        "status_code": "INTEGER",
+        "latency": "REAL",
+        "payload_size": "INTEGER",
+        "timestamp": "TEXT",
+    },
+    "api_usage_rollups": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "period": "TEXT",
+        "period_start": "TEXT",
+        "total_requests": "INTEGER",
+        "error_rate": "REAL",
+        "p50_latency": "REAL",
+        "p95_latency": "REAL",
+        "p99_latency": "REAL",
+        "created_at": "TEXT",
+    },
+    "api_billing_tiers": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "tier_name": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    "users_archive": {
+        "id": "INTEGER",
+        "username": "TEXT",
+        "email": "TEXT",
+        "password_hash": "TEXT",
+        "anonymous_leaderboard": "INTEGER",
+        "created_at": "TIMESTAMP",
+        "deleted_at": "TIMESTAMP",
+    },
+    "assessments_archive": {
+        "id": "INTEGER",
+        "user_id": "INTEGER",
+        "date": "TIMESTAMP",
+        "created_at": "TIMESTAMP",
+        "transport": "TEXT",
+        "distance": "REAL",
+        "electricity": "REAL",
+        "diet": "TEXT",
+        "flights": "INTEGER",
+        "footprint": "REAL",
+        "eco_score": "INTEGER",
+        "trip_id": "TEXT",
+        "factor_version": "TEXT",
+        "updated_at": "TIMESTAMP",
+        "client_uuid": "TEXT",
+        "source_device": "TEXT",
+        "deleted_at": "TIMESTAMP",
+    },
+    "soft_deleted_users": {
+        "user_id": "INTEGER",
+        "deleted_at": "TIMESTAMP",
+    },
+    "data_retention_audit_log": {
+        "id": "INTEGER",
+        "action": "TEXT",
+        "table_name": "TEXT",
+        "record_id": "TEXT",
+        "details": "TEXT",
+        "timestamp": "DATETIME",
+>>>>>>> upstream/main
     },
 }
 
@@ -309,9 +381,19 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
         "credit_trades",
         ("buyer_id",),
     ),
+<<<<<<< HEAD
     "idx_experiment_metrics_flag": (
         "experiment_metrics",
         ("flag_name", "variant"),
+=======
+    "idx_api_usage_key_id_timestamp": (
+        "api_usage_records",
+        ("key_id", "timestamp"),
+    ),
+    "idx_api_usage_rollups_key_period": (
+        "api_usage_rollups",
+        ("key_id", "period", "period_start"),
+>>>>>>> upstream/main
     ),
 }
 

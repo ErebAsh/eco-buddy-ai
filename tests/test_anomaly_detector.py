@@ -3,8 +3,8 @@ Unit tests for Anomaly Detector and Alert Manager.
 """
 
 import pytest
-from anomaly_detector import AnomalyDetector
-from alert_manager import AlertManager
+from src.services.anomaly_detector import AnomalyDetector
+from src.services.alert_manager import AlertManager
 
 
 def test_calculate_statistics():

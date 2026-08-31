@@ -201,7 +201,7 @@ def validate_export_document(document: Any) -> tuple[bool, list[str]]:
         uid = document["metadata"]["exported_user_id"]
         if isinstance(uid, bool) or not isinstance(uid, int) or uid < 1:
             errors.append("metadata.exported_user_id must be a positive integer")
-errors.extend(_validate_record_list("assessments", document.get("assessments", []), {
+    errors.extend(_validate_record_list("assessments", document.get("assessments", []), {
         "distance": (0, 10_000_000), "electricity": (0, 10_000_000), "flights": (0, 10_000), "footprint": (0, 10_000_000), "eco_score": (0, 100),
     }))
     errors.extend(_validate_record_list("goals", document.get("goals", []), {"baseline_kg": (0, 10_000_000), "target_kg": (0, 10_000_000)}))

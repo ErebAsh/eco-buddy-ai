@@ -1,23 +1,37 @@
 """
 Dependency-aware cache invalidation registry for EcoBuddy AI.
 
-Maps write operations to the set of cached functions they should invalidate.
+Maps domain events to the set of cached functions they should invalidate.
 This replaces scattered `.clear()` calls with a centralized, maintainable registry.
-
-Usage:
-    from src.core.invalidation import invalidate_on_assessment_save, invalidate_all_db_caches
-
-    # In src.core.database.py save_assessment():
-    invalidate_on_assessment_save()
-
-    # In src.data.data_io.py import_data_json():
-    invalidate_all_db_caches()
 """
 
 import streamlit as st
 
 from collections.abc import Callable
 from typing import Any
+
+from src.core.event_bus import event_handler
+from src.core.domain_events import (
+    AssessmentSaved,
+    AssessmentUndone,
+    ApplianceChanged,
+    SolarConfigSaved,
+    ChallengeEnrolled,
+    ChallengeProgressed,
+    ChallengeCompleted,
+    XPAwarded,
+    BadgeUnlocked,
+    SkillTreeUpdated,
+    JourneySaved,
+    JourneyDeleted,
+    OffsetSaved,
+    OffsetDeleted,
+    OffsetCleared,
+    WaterAssessmentSaved,
+    ReductionGoalChanged,
+    FreezeTokenChanged,
+    TimeCapsuleChanged,
+)
 
 # Registry of all cached functions, populated by the @cached decorator
 _CACHED_FUNCTION_REGISTRY = {}
@@ -65,11 +79,13 @@ def get_all_cached_functions() -> dict[str, Callable[..., Any]]:
 
 # ---------------------------------------------------------------------------
 # Write-operation invalidation helpers
-# Each function maps a specific write operation to its dependent cache keys.
+# Each function acts as an event handler and clears dependent caches.
 # ---------------------------------------------------------------------------
 
-def invalidate_on_assessment_save() -> None:
-    """Invalidate caches dependent on assessment writes."""
+@event_handler(AssessmentSaved)
+@event_handler(AssessmentUndone)
+def invalidate_on_assessment_save(event=None) -> None:
+    """Invalidate caches dependent on assessment writes or undo."""
     _clear_by_name([
         'get_assessments',
         'get_diet_history',
@@ -77,50 +93,37 @@ def invalidate_on_assessment_save() -> None:
     ])
 
 
-def invalidate_on_assessment_undo() -> None:
-    """Invalidate caches dependent on assessment undo or restore operations."""
-    invalidate_on_assessment_save()
-
-
-
-def invalidate_on_appliance_change() -> None:
+@event_handler(ApplianceChanged)
+def invalidate_on_appliance_change(event=None) -> None:
     """Invalidate caches dependent on appliance add/delete."""
     _clear_by_name([
         'get_appliances',
     ])
 
 
-def invalidate_on_solar_config_save() -> None:
+@event_handler(SolarConfigSaved)
+def invalidate_on_solar_config_save(event=None) -> None:
     """Invalidate caches dependent on solar config changes."""
     _clear_by_name([
         'get_solar_config',
     ])
 
 
-def invalidate_on_challenge_enroll() -> None:
-    """Invalidate caches dependent on challenge enrollment."""
+@event_handler(ChallengeEnrolled)
+@event_handler(ChallengeProgressed)
+@event_handler(ChallengeCompleted)
+def invalidate_on_challenge_enroll(event=None) -> None:
+    """Invalidate caches dependent on challenge enrollment/progress/completion."""
     _clear_by_name([
         'get_user_challenges',
     ])
 
 
-def invalidate_on_challenge_progress() -> None:
-    """Invalidate caches dependent on challenge progress update."""
-    _clear_by_name([
-        'get_user_challenges',
-    ])
-
-
-def invalidate_on_challenge_complete() -> None:
-    """Invalidate caches dependent on challenge completion."""
-    _clear_by_name([
-        'get_user_challenges',
-    ])
-
-
-def invalidate_on_xp_award(source_type: str | None = None) -> None:
+@event_handler(XPAwarded)
+def invalidate_on_xp_award(event: XPAwarded = None) -> None:
     """Invalidate caches dependent on XP award."""
     names = ['get_total_xp']
+    source_type = event.source_type if event else None
     if source_type == 'challenge':
         names.append('get_user_challenges')
     elif source_type == 'badge':
@@ -128,7 +131,8 @@ def invalidate_on_xp_award(source_type: str | None = None) -> None:
     _clear_by_name(names)
 
 
-def invalidate_on_badge_unlock() -> None:
+@event_handler(BadgeUnlocked)
+def invalidate_on_badge_unlock(event=None) -> None:
     """Invalidate caches dependent on badge unlock."""
     _clear_by_name([
         'get_unlocked_badges',
@@ -136,29 +140,28 @@ def invalidate_on_badge_unlock() -> None:
     ])
 
 
-def invalidate_on_skill_tree_update() -> None:
+@event_handler(SkillTreeUpdated)
+def invalidate_on_skill_tree_update(event=None) -> None:
     """Invalidate caches dependent on skill tree node update."""
     _clear_by_name([
         'get_skill_tree_progress',
     ])
 
 
-def invalidate_on_journey_save() -> None:
-    """Invalidate caches dependent on journey profile save."""
+@event_handler(JourneySaved)
+@event_handler(JourneyDeleted)
+def invalidate_on_journey_save(event=None) -> None:
+    """Invalidate caches dependent on journey profile save or delete."""
     _clear_by_name([
         'get_journey_profiles',
     ])
 
 
-def invalidate_on_journey_delete() -> None:
-    """Invalidate caches dependent on journey profile delete."""
-    _clear_by_name([
-        'get_journey_profiles',
-    ])
-
-
-def invalidate_on_offset_save() -> None:
-    """Invalidate caches dependent on offset transaction save."""
+@event_handler(OffsetSaved)
+@event_handler(OffsetDeleted)
+@event_handler(OffsetCleared)
+def invalidate_on_offset_save(event=None) -> None:
+    """Invalidate caches dependent on offset transaction save/delete/clear."""
     _clear_by_name([
         'get_offset_transactions',
         'get_total_offsets',
@@ -166,32 +169,16 @@ def invalidate_on_offset_save() -> None:
     ])
 
 
-def invalidate_on_offset_delete() -> None:
-    """Invalidate caches dependent on offset transaction delete."""
-    _clear_by_name([
-        'get_offset_transactions',
-        'get_total_offsets',
-        'get_total_spend',
-    ])
-
-
-def invalidate_on_offset_clear() -> None:
-    """Invalidate caches dependent on clearing all offset transactions."""
-    _clear_by_name([
-        'get_offset_transactions',
-        'get_total_offsets',
-        'get_total_spend',
-    ])
-
-
-def invalidate_on_water_assessment_save() -> None:
+@event_handler(WaterAssessmentSaved)
+def invalidate_on_water_assessment_save(event=None) -> None:
     """Invalidate caches dependent on water assessment save."""
     _clear_by_name([
         'get_water_assessments',
     ])
 
 
-def invalidate_on_freeze_token_change() -> None:
+@event_handler(FreezeTokenChanged)
+def invalidate_on_freeze_token_change(event=None) -> None:
     """Invalidate caches dependent on freeze token or streak freeze changes."""
     _clear_by_name([
         'get_freeze_token_balance',
@@ -200,7 +187,8 @@ def invalidate_on_freeze_token_change() -> None:
     ])
 
 
-def invalidate_on_reduction_goal_change() -> None:
+@event_handler(ReductionGoalChanged)
+def invalidate_on_reduction_goal_change(event=None) -> None:
     """Invalidate caches dependent on reduction goal create/archive/complete."""
     _clear_by_name([
         'get_active_goal',
@@ -208,7 +196,8 @@ def invalidate_on_reduction_goal_change() -> None:
     ])
 
 
-def invalidate_on_time_capsule_change() -> None:
+@event_handler(TimeCapsuleChanged)
+def invalidate_on_time_capsule_change(event=None) -> None:
     """Invalidate caches dependent on time capsule operations."""
     _clear_by_name([
         'get_time_capsules',

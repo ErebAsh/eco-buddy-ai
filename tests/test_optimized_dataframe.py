@@ -6,7 +6,7 @@ Tests vectorized operations, edge cases, and performance.
 
 import pandas as pd
 import pytest
-from optimized_dataframe_utils import process_user_data_optimized, calculate_dashboard_metrics_optimized
+from src.utils.optimized_dataframe_utils import process_user_data_optimized, calculate_dashboard_metrics_optimized
 
 
 # ==============================================================================
