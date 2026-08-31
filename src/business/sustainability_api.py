@@ -19,7 +19,8 @@ from src.ai.recommendations import generate_recommendations
 from src.core.database import get_assessments, get_active_goal
 from src.utils.goals import evaluate_progress
 from src.core.api_auth import authenticate_request, generate_api_key, init_api_keys_db
-from src.core.rate_limiter import CompositeRateLimiter
+from src.core.rate_limiter import RateLimitMiddleware, CompositeRateLimiter
+from src.core.errors import RateLimitExceeded
 import time
 from datetime import datetime, timezone
 from src.business.api_usage_meter import usage_meter, UsageRecord
@@ -362,9 +363,15 @@ def _process_api_request_internal(
     # ------------------------------------------------------------------ #
     # Rate Limiting
     # ------------------------------------------------------------------ #
-    is_allowed, status_code, rl_headers = CompositeRateLimiter.check_limit(key_id, rate_limit, path)
-    if not is_allowed:
-        return status_code, {"error": "Too Many Requests", "message": "Rate limit exceeded."}, "application/json", rl_headers
+    try:
+        rl_headers = RateLimitMiddleware.check_request(key_id, rate_limit, auth_res.get("role", "developer"), path)
+    except RateLimitExceeded as exc:
+        import ast
+        try:
+            rl_headers = ast.literal_eval(exc.details)
+        except Exception:
+            rl_headers = {"Retry-After": "60"}
+        return 429, {"error": "Too Many Requests", "message": exc.message}, "application/json", rl_headers
 
     # GET /api/v1/usage/summary
     if method == "GET" and path == _route("/usage/summary"):
@@ -405,6 +412,7 @@ def _process_api_request_internal(
                 400,
                 {"error": "Bad Request", "message": "JSON body is required."},
                 "application/json",
+                rl_headers,
             )
         try:
             transport = str(body.get("transport", "Car"))
@@ -434,12 +442,14 @@ def _process_api_request_internal(
                     },
                 },
                 "application/json",
+                rl_headers,
             )
         except Exception as exc:
             return (
                 400,
                 {"error": "Calculation Error", "message": str(exc)},
                 "application/json",
+                rl_headers,
             )
 
     # GET /api/v1/insights/assessments
@@ -466,6 +476,7 @@ def _process_api_request_internal(
             200,
             {"success": True, "count": len(assessments), "data": assessments},
             "application/json",
+            rl_headers,
         )
 
     # GET /api/v1/insights/recommendations
@@ -487,6 +498,7 @@ def _process_api_request_internal(
             200,
             {"success": True, "data": {"insight": insight, "recommendations": recs}},
             "application/json",
+            rl_headers,
         )
 
     # GET /api/v1/insights/goals
@@ -501,6 +513,7 @@ def _process_api_request_internal(
                     "message": "No active reduction goal found for user.",
                 },
                 "application/json",
+                rl_headers,
             )
         raw_assessments = get_assessments(user_id=user_id) or []
         eval_data = evaluate_progress(goal, raw_assessments)
@@ -508,6 +521,7 @@ def _process_api_request_internal(
             200,
             {"success": True, "data": {"goal": goal, "evaluation": eval_data}},
             "application/json",
+            rl_headers,
         )
 
     # POST /api/v1/calculator/rainwater-tank
@@ -517,6 +531,7 @@ def _process_api_request_internal(
                 400,
                 {"error": "Bad Request", "message": "JSON body is required."},
                 "application/json",
+                rl_headers,
             )
         try:
             from src.environment.rainwater import (
@@ -567,12 +582,14 @@ def _process_api_request_internal(
                     }
                 },
                 "application/json",
+                rl_headers,
             )
         except Exception as exc:
             return (
                 400,
                 {"error": "Calculation Error", "message": str(exc)},
                 "application/json",
+                rl_headers,
             )
 
 
@@ -583,6 +600,7 @@ def _process_api_request_internal(
             "message": f"Endpoint '{path}' with method '{method}' not found.",
         },
         "application/json",
+        rl_headers,
     )
 
 

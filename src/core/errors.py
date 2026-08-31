@@ -128,6 +128,12 @@ class RateLimitError(AppError):
     code = "RATE_LIMITED"
 
 
+class RateLimitExceeded(RateLimitError):
+    """The API key has exceeded its assigned quota."""
+
+    code = "RATE_LIMIT_EXCEEDED"
+
+
 class ExternalServiceError(AppError):
     """A downstream/third-party service failed, timed out, or was unreachable."""
 
