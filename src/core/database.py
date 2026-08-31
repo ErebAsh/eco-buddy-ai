@@ -4,26 +4,27 @@ from datetime import datetime, timedelta
 from src.core.database_connection import database_connection, execute_with_retry
 from src.core.cache import cached
 from src.core.cache_config import TTL_DB_READ, CACHE_CATEGORY_DB_READS
-from src.core.invalidation import (
-    invalidate_on_assessment_save,
-    invalidate_on_assessment_undo,
-    invalidate_on_appliance_change,
-    invalidate_on_solar_config_save,
-    invalidate_on_challenge_enroll,
-    invalidate_on_challenge_progress,
-    invalidate_on_challenge_complete,
-    invalidate_on_xp_award,
-    invalidate_on_badge_unlock,
-    invalidate_on_skill_tree_update,
-    invalidate_on_journey_save,
-    invalidate_on_journey_delete,
-    invalidate_on_offset_save,
-    invalidate_on_offset_delete,
-    invalidate_on_offset_clear,
-    invalidate_on_water_assessment_save,
-    invalidate_on_reduction_goal_change,
-    invalidate_on_freeze_token_change,
-    invalidate_on_time_capsule_change,
+from src.core.event_bus import EventBus
+from src.core.domain_events import (
+    AssessmentSaved,
+    AssessmentUndone,
+    ApplianceChanged,
+    SolarConfigSaved,
+    ChallengeEnrolled,
+    ChallengeProgressed,
+    ChallengeCompleted,
+    XPAwarded,
+    BadgeUnlocked,
+    SkillTreeUpdated,
+    JourneySaved,
+    JourneyDeleted,
+    OffsetSaved,
+    OffsetDeleted,
+    OffsetCleared,
+    WaterAssessmentSaved,
+    ReductionGoalChanged,
+    FreezeTokenChanged,
+    TimeCapsuleChanged,
 )
 import streamlit as st
 import bcrypt
@@ -1059,7 +1060,7 @@ def save_assessment(
 
         conn.commit()
         conn.close()
-        invalidate_on_assessment_save()
+        EventBus.publish(AssessmentSaved())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -1453,7 +1454,7 @@ def undo_last_assessment(user_id: int = 1) -> tuple[bool, str, dict[str, Any] | 
         conn.commit()
         conn.close()
 
-        invalidate_on_assessment_undo()
+        EventBus.publish(AssessmentUndone())
         record_dict = {
             "id": rec_id,
             "date": date,
@@ -1524,7 +1525,7 @@ def restore_last_deleted_assessment(user_id: int = 1) -> tuple[bool, str, dict[s
         conn.commit()
         conn.close()
 
-        invalidate_on_assessment_save()
+        EventBus.publish(AssessmentSaved())
         return True, f"Successfully restored assessment #{new_id}.", {"id": new_id, "footprint": footprint}
     except sqlite3.Error as e:
         logger.error("Restore assessment error: %s", e)
@@ -1798,7 +1799,7 @@ def add_appliance(user_id: int, name: str, category: str, quantity: int, power_r
         """, (user_id, name, category, quantity, power_rating, hours_used, standby_draw))
         conn.commit()
         conn.close()
-        invalidate_on_appliance_change()
+        EventBus.publish(ApplianceChanged())
         return True
     except sqlite3.Error as e:
         print(f"Appliance save error: {e}")
@@ -1812,7 +1813,7 @@ def delete_appliance(app_id: int) -> bool:
         cursor.execute("DELETE FROM appliances WHERE id = ?", (app_id,))
         conn.commit()
         conn.close()
-        invalidate_on_appliance_change()
+        EventBus.publish(ApplianceChanged())
         return True
     except sqlite3.Error as e:
         return False
@@ -1847,7 +1848,7 @@ def save_solar_config(user_id: int, roof_space: float, peak_sun_hours: float, ut
         """, (user_id, roof_space, peak_sun_hours, utility_rate, panel_efficiency, install_cost, maint_cost, rate_inc))
         conn.commit()
         conn.close()
-        invalidate_on_solar_config_save()
+        EventBus.publish(SolarConfigSaved())
         return True
     except sqlite3.Error as e:
         return False
@@ -1974,7 +1975,7 @@ def enroll_challenge(user_id: int, challenge_id: str) -> bool:
             VALUES (?, ?, 'enrolled')
         """, (user_id, challenge_id))
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"enroll_challenge error: {e}")
@@ -2004,7 +2005,7 @@ def update_challenge_progress(user_id: int, challenge_id: str, progress_incremen
             """, (set_progress, user_id, challenge_id))
             
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"update_challenge_progress error: {e}")
@@ -2027,7 +2028,7 @@ def complete_challenge(user_id: int, challenge_id: str) -> bool:
         """, (user_id, challenge_id))
         
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"complete_challenge error: {e}")
@@ -2067,13 +2068,13 @@ def award_xp(user_id: int, source_type: str, source_id: str, xp_amount: int, des
         
         if source_type == 'challenge':
             cursor.execute("UPDATE user_challenges SET xp_awarded = 1 WHERE user_id = ? AND challenge_id = ?", (user_id, source_id))
-            invalidate_on_challenge_enroll()
+            EventBus.publish(ChallengeEnrolled())
         elif source_type == 'badge':
             cursor.execute("UPDATE unlocked_badges SET xp_awarded = 1 WHERE user_id = ? AND badge_id = ?", (user_id, source_id))
-            invalidate_on_badge_unlock()
+            EventBus.publish(BadgeUnlocked())
             
         conn.commit()
-        invalidate_on_xp_award()
+        EventBus.publish(XPAwarded())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -2114,8 +2115,8 @@ def unlock_badge_in_db(user_id: int, badge_id: str) -> bool:
         """, (user_id, badge_id))
         
         conn.commit()
-        invalidate_on_badge_unlock()
-        invalidate_on_xp_award()
+        EventBus.publish(BadgeUnlocked())
+        EventBus.publish(XPAwarded())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -2235,7 +2236,7 @@ def update_skill_node_status(user_id: int, node_id: str, status: str) -> bool:
                 """, (user_id, node_id, status))
                 
         conn.commit()
-        invalidate_on_skill_tree_update()
+        EventBus.publish(SkillTreeUpdated())
         return True
     except sqlite3.Error as e:
         print(f"update_skill_node_status error: {e}")
@@ -2313,7 +2314,7 @@ def save_journey_profile(user_id: int, name: str, distance_km: float, transport_
         ''', (user_id, name, distance_km, transport_mode, passenger_count, trips_per_week, is_commute))
         
         conn.commit()
-        invalidate_on_journey_save()
+        EventBus.publish(JourneySaved())
         return True
     except Exception as e:
         print(f'save_journey_profile error: {e}')
@@ -2347,7 +2348,7 @@ def delete_journey_profile(profile_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM journey_profiles WHERE id = ?', (profile_id,))
         conn.commit()
-        invalidate_on_journey_save()
+        EventBus.publish(JourneySaved())
         return True
     except Exception:
         return False
@@ -2368,7 +2369,7 @@ def save_offset_transaction(user_id: int, project_id: str, project_name: str, of
         ''', (user_id, project_id, project_name, offset_tonnes, cost_per_tonne, total_cost, transaction_status))
         
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception as e:
         print(f'save_offset_transaction error: {e}')
@@ -2402,7 +2403,7 @@ def delete_offset_transaction(transaction_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM offset_transactions WHERE id = ?', (transaction_id,))
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception:
         return False
@@ -2418,7 +2419,7 @@ def clear_offset_transactions(user_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM offset_transactions WHERE user_id = ?', (user_id,))
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception:
         return False
@@ -2510,7 +2511,7 @@ def save_water_assessment(user_id: int, shower: float, laundry: float, dishwashe
         ''', (user_id, shower, laundry, dishwasher, garden, diet, total_liters))
         
         conn.commit()
-        invalidate_on_water_assessment_save()
+        EventBus.publish(WaterAssessmentSaved())
         return True
     except Exception as e:
         print(f'save_water_assessment error: {e}')
@@ -2807,7 +2808,7 @@ def award_freeze_tokens(user_id: int, amount: int, reason: str) -> bool:
             VALUES (?, ?, ?)
         """, (user_id, amount, reason))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return True
     except sqlite3.Error as e:
         logger.error("award_freeze_tokens error: %s", e)
@@ -2836,7 +2837,7 @@ def redeem_freeze_token(user_id: int) -> bool:
             VALUES (?, ?, ?)
         """, (user_id, -1, 'redeem'))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return True
     except sqlite3.Error as e:
         logger.error("redeem_freeze_token error: %s", e)
@@ -2856,7 +2857,7 @@ def use_streak_freeze(user_id: int, frozen_date: str) -> bool:
             VALUES (?, ?)
         """, (user_id, frozen_date))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return cursor.rowcount > 0
     except sqlite3.Error as e:
         logger.error("use_streak_freeze error: %s", e)
@@ -3013,7 +3014,7 @@ def save_reduction_goal(user_id: int, baseline_kg: float, target_kg: float, star
         ))
         goal_id = cursor.lastrowid
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return goal_id
     except sqlite3.Error as exc:
         logger.error("Unable to save reduction goal: %s", exc)
@@ -3089,7 +3090,7 @@ def update_goal_status(goal_id: int, status: str) -> bool:
         )
         changed = cursor.rowcount > 0
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return changed
     except sqlite3.Error as exc:
         logger.error("Unable to update goal status: %s", exc)
@@ -3119,7 +3120,7 @@ def delete_reduction_goal(goal_id: int) -> bool:
         cursor.execute("DELETE FROM reduction_goals WHERE id = ?", (goal_id,))
         deleted = cursor.rowcount > 0
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return deleted
     except sqlite3.Error as exc:
         logger.error("Unable to delete reduction goal: %s", exc)
@@ -3608,7 +3609,7 @@ def create_time_capsule(user_id: int, title: str, promise_text: str, category: s
             VALUES (?, ?, ?, ?, ?)
         """, (user_id, title, promise_text, category, unlock_date))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("create_time_capsule error: %s", e)
@@ -3653,7 +3654,7 @@ def update_time_capsule_unlock(capsule_id: int) -> bool:
             WHERE id = ? AND is_unlocked = 0
         """, (capsule_id,))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return cursor.rowcount > 0
     except sqlite3.Error as e:
         logger.error("update_time_capsule_unlock error: %s", e)
@@ -3674,7 +3675,7 @@ def update_time_capsule_progress(capsule_id: int, progress_notes: str) -> bool:
             WHERE id = ?
         """, (progress_notes, capsule_id))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("update_time_capsule_progress error: %s", e)
@@ -3691,7 +3692,7 @@ def delete_time_capsule(capsule_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM time_capsules WHERE id = ?", (capsule_id,))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("delete_time_capsule error: %s", e)
@@ -4658,26 +4659,27 @@ from src.community.challenge_generator import generate_weekly_challenges
 from src.core.database_connection import database_connection, execute_with_retry
 from src.core.cache import cached
 from src.core.cache_config import TTL_DB_READ, CACHE_CATEGORY_DB_READS
-from src.core.invalidation import (
-    invalidate_on_assessment_save,
-    invalidate_on_assessment_undo,
-    invalidate_on_appliance_change,
-    invalidate_on_solar_config_save,
-    invalidate_on_challenge_enroll,
-    invalidate_on_challenge_progress,
-    invalidate_on_challenge_complete,
-    invalidate_on_xp_award,
-    invalidate_on_badge_unlock,
-    invalidate_on_skill_tree_update,
-    invalidate_on_journey_save,
-    invalidate_on_journey_delete,
-    invalidate_on_offset_save,
-    invalidate_on_offset_delete,
-    invalidate_on_offset_clear,
-    invalidate_on_water_assessment_save,
-    invalidate_on_reduction_goal_change,
-    invalidate_on_freeze_token_change,
-    invalidate_on_time_capsule_change,
+from src.core.event_bus import EventBus
+from src.core.domain_events import (
+    AssessmentSaved,
+    AssessmentUndone,
+    ApplianceChanged,
+    SolarConfigSaved,
+    ChallengeEnrolled,
+    ChallengeProgressed,
+    ChallengeCompleted,
+    XPAwarded,
+    BadgeUnlocked,
+    SkillTreeUpdated,
+    JourneySaved,
+    JourneyDeleted,
+    OffsetSaved,
+    OffsetDeleted,
+    OffsetCleared,
+    WaterAssessmentSaved,
+    ReductionGoalChanged,
+    FreezeTokenChanged,
+    TimeCapsuleChanged,
 )
 import streamlit as st
 import bcrypt
@@ -5189,7 +5191,7 @@ def save_assessment(
 
         conn.commit()
         conn.close()
-        invalidate_on_assessment_save()
+        EventBus.publish(AssessmentSaved())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -5439,7 +5441,7 @@ def undo_last_assessment(user_id: int = 1) -> tuple[bool, str, dict[str, Any] | 
         conn.commit()
         conn.close()
 
-        invalidate_on_assessment_undo()
+        EventBus.publish(AssessmentUndone())
         record_dict = {
             "id": rec_id,
             "date": date,
@@ -5510,7 +5512,7 @@ def restore_last_deleted_assessment(user_id: int = 1) -> tuple[bool, str, dict[s
         conn.commit()
         conn.close()
 
-        invalidate_on_assessment_save()
+        EventBus.publish(AssessmentSaved())
         return True, f"Successfully restored assessment #{new_id}.", {"id": new_id, "footprint": footprint}
     except sqlite3.Error as e:
         logger.error("Restore assessment error: %s", e)
@@ -5784,7 +5786,7 @@ def add_appliance(user_id: int, name: str, category: str, quantity: int, power_r
         """, (user_id, name, category, quantity, power_rating, hours_used, standby_draw))
         conn.commit()
         conn.close()
-        invalidate_on_appliance_change()
+        EventBus.publish(ApplianceChanged())
         return True
     except sqlite3.Error as e:
         print(f"Appliance save error: {e}")
@@ -5798,7 +5800,7 @@ def delete_appliance(app_id: int) -> bool:
         cursor.execute("DELETE FROM appliances WHERE id = ?", (app_id,))
         conn.commit()
         conn.close()
-        invalidate_on_appliance_change()
+        EventBus.publish(ApplianceChanged())
         return True
     except sqlite3.Error as e:
         return False
@@ -5833,7 +5835,7 @@ def save_solar_config(user_id: int, roof_space: float, peak_sun_hours: float, ut
         """, (user_id, roof_space, peak_sun_hours, utility_rate, panel_efficiency, install_cost, maint_cost, rate_inc))
         conn.commit()
         conn.close()
-        invalidate_on_solar_config_save()
+        EventBus.publish(SolarConfigSaved())
         return True
     except sqlite3.Error as e:
         return False
@@ -5960,7 +5962,7 @@ def enroll_challenge(user_id: int, challenge_id: str) -> bool:
             VALUES (?, ?, 'enrolled')
         """, (user_id, challenge_id))
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"enroll_challenge error: {e}")
@@ -5990,7 +5992,7 @@ def update_challenge_progress(user_id: int, challenge_id: str, progress_incremen
             """, (set_progress, user_id, challenge_id))
             
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"update_challenge_progress error: {e}")
@@ -6013,7 +6015,7 @@ def complete_challenge(user_id: int, challenge_id: str) -> bool:
         """, (user_id, challenge_id))
         
         conn.commit()
-        invalidate_on_challenge_enroll()
+        EventBus.publish(ChallengeEnrolled())
         return True
     except sqlite3.Error as e:
         print(f"complete_challenge error: {e}")
@@ -6053,13 +6055,13 @@ def award_xp(user_id: int, source_type: str, source_id: str, xp_amount: int, des
         
         if source_type == 'challenge':
             cursor.execute("UPDATE user_challenges SET xp_awarded = 1 WHERE user_id = ? AND challenge_id = ?", (user_id, source_id))
-            invalidate_on_challenge_enroll()
+            EventBus.publish(ChallengeEnrolled())
         elif source_type == 'badge':
             cursor.execute("UPDATE unlocked_badges SET xp_awarded = 1 WHERE user_id = ? AND badge_id = ?", (user_id, source_id))
-            invalidate_on_badge_unlock()
+            EventBus.publish(BadgeUnlocked())
             
         conn.commit()
-        invalidate_on_xp_award()
+        EventBus.publish(XPAwarded())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -6100,8 +6102,8 @@ def unlock_badge_in_db(user_id: int, badge_id: str) -> bool:
         """, (user_id, badge_id))
         
         conn.commit()
-        invalidate_on_badge_unlock()
-        invalidate_on_xp_award()
+        EventBus.publish(BadgeUnlocked())
+        EventBus.publish(XPAwarded())
         return True
     except sqlite3.IntegrityError:
         return False
@@ -6221,7 +6223,7 @@ def update_skill_node_status(user_id: int, node_id: str, status: str) -> bool:
                 """, (user_id, node_id, status))
                 
         conn.commit()
-        invalidate_on_skill_tree_update()
+        EventBus.publish(SkillTreeUpdated())
         return True
     except sqlite3.Error as e:
         print(f"update_skill_node_status error: {e}")
@@ -6299,7 +6301,7 @@ def save_journey_profile(user_id: int, name: str, distance_km: float, transport_
         ''', (user_id, name, distance_km, transport_mode, passenger_count, trips_per_week, is_commute))
         
         conn.commit()
-        invalidate_on_journey_save()
+        EventBus.publish(JourneySaved())
         return True
     except Exception as e:
         print(f'save_journey_profile error: {e}')
@@ -6333,7 +6335,7 @@ def delete_journey_profile(profile_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM journey_profiles WHERE id = ?', (profile_id,))
         conn.commit()
-        invalidate_on_journey_save()
+        EventBus.publish(JourneySaved())
         return True
     except Exception:
         return False
@@ -6354,7 +6356,7 @@ def save_offset_transaction(user_id: int, project_id: str, project_name: str, of
         ''', (user_id, project_id, project_name, offset_tonnes, cost_per_tonne, total_cost, transaction_status))
         
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception as e:
         print(f'save_offset_transaction error: {e}')
@@ -6388,7 +6390,7 @@ def delete_offset_transaction(transaction_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM offset_transactions WHERE id = ?', (transaction_id,))
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception:
         return False
@@ -6404,7 +6406,7 @@ def clear_offset_transactions(user_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM offset_transactions WHERE user_id = ?', (user_id,))
         conn.commit()
-        invalidate_on_offset_save()
+        EventBus.publish(OffsetSaved())
         return True
     except Exception:
         return False
@@ -6496,7 +6498,7 @@ def save_water_assessment(user_id: int, shower: float, laundry: float, dishwashe
         ''', (user_id, shower, laundry, dishwasher, garden, diet, total_liters))
         
         conn.commit()
-        invalidate_on_water_assessment_save()
+        EventBus.publish(WaterAssessmentSaved())
         return True
     except Exception as e:
         print(f'save_water_assessment error: {e}')
@@ -6793,7 +6795,7 @@ def award_freeze_tokens(user_id: int, amount: int, reason: str) -> bool:
             VALUES (?, ?, ?)
         """, (user_id, amount, reason))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return True
     except sqlite3.Error as e:
         logger.error("award_freeze_tokens error: %s", e)
@@ -6822,7 +6824,7 @@ def redeem_freeze_token(user_id: int) -> bool:
             VALUES (?, ?, ?)
         """, (user_id, -1, 'redeem'))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return True
     except sqlite3.Error as e:
         logger.error("redeem_freeze_token error: %s", e)
@@ -6842,7 +6844,7 @@ def use_streak_freeze(user_id: int, frozen_date: str) -> bool:
             VALUES (?, ?)
         """, (user_id, frozen_date))
         conn.commit()
-        invalidate_on_freeze_token_change()
+        EventBus.publish(FreezeTokenChanged())
         return cursor.rowcount > 0
     except sqlite3.Error as e:
         logger.error("use_streak_freeze error: %s", e)
@@ -6999,7 +7001,7 @@ def save_reduction_goal(user_id: int, baseline_kg: float, target_kg: float, star
         ))
         goal_id = cursor.lastrowid
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return goal_id
     except sqlite3.Error as exc:
         logger.error("Unable to save reduction goal: %s", exc)
@@ -7075,7 +7077,7 @@ def update_goal_status(goal_id: int, status: str) -> bool:
         )
         changed = cursor.rowcount > 0
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return changed
     except sqlite3.Error as exc:
         logger.error("Unable to update goal status: %s", exc)
@@ -7105,7 +7107,7 @@ def delete_reduction_goal(goal_id: int) -> bool:
         cursor.execute("DELETE FROM reduction_goals WHERE id = ?", (goal_id,))
         deleted = cursor.rowcount > 0
         conn.commit()
-        invalidate_on_reduction_goal_change()
+        EventBus.publish(ReductionGoalChanged())
         return deleted
     except sqlite3.Error as exc:
         logger.error("Unable to delete reduction goal: %s", exc)
@@ -7594,7 +7596,7 @@ def create_time_capsule(user_id: int, title: str, promise_text: str, category: s
             VALUES (?, ?, ?, ?, ?)
         """, (user_id, title, promise_text, category, unlock_date))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("create_time_capsule error: %s", e)
@@ -7639,7 +7641,7 @@ def update_time_capsule_unlock(capsule_id: int) -> bool:
             WHERE id = ? AND is_unlocked = 0
         """, (capsule_id,))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return cursor.rowcount > 0
     except sqlite3.Error as e:
         logger.error("update_time_capsule_unlock error: %s", e)
@@ -7660,7 +7662,7 @@ def update_time_capsule_progress(capsule_id: int, progress_notes: str) -> bool:
             WHERE id = ?
         """, (progress_notes, capsule_id))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("update_time_capsule_progress error: %s", e)
@@ -7677,7 +7679,7 @@ def delete_time_capsule(capsule_id: int) -> bool:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM time_capsules WHERE id = ?", (capsule_id,))
         conn.commit()
-        invalidate_on_time_capsule_change()
+        EventBus.publish(TimeCapsuleChanged())
         return True
     except sqlite3.Error as e:
         logger.error("delete_time_capsule error: %s", e)
