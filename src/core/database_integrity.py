@@ -241,7 +241,6 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "lifetime_spent": "REAL",
         "updated_at": "TIMESTAMP",
     },
-<<<<<<< HEAD
     "feature_flags": {
         "name": "TEXT",
         "enabled": "BOOLEAN",
@@ -272,7 +271,12 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "metric_name": "TEXT",
         "metric_value": "REAL",
         "recorded_at": "TIMESTAMP",
-=======
+    },
+    "api_rate_limits": {
+        "key_id": "INTEGER",
+        "window_start": "INTEGER",
+        "request_count": "INTEGER",
+    },
     "api_usage_records": {
         "id": "INTEGER",
         "key_id": "TEXT",
@@ -301,6 +305,7 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "tier_name": "TEXT",
         "created_at": "TEXT",
         "updated_at": "TEXT",
+    },
     "users_archive": {
         "id": "INTEGER",
         "username": "TEXT",
@@ -340,7 +345,7 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "record_id": "TEXT",
         "details": "TEXT",
         "timestamp": "DATETIME",
->>>>>>> upstream/main
+        "timestamp": "DATETIME",
     },
 }
 
@@ -381,11 +386,14 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
         "credit_trades",
         ("buyer_id",),
     ),
-<<<<<<< HEAD
     "idx_experiment_metrics_flag": (
         "experiment_metrics",
         ("flag_name", "variant"),
-=======
+    ),
+    "idx_api_rate_limits_key_window": (
+        "api_rate_limits",
+        ("key_id", "window_start"),
+    ),
     "idx_api_usage_key_id_timestamp": (
         "api_usage_records",
         ("key_id", "timestamp"),
@@ -393,7 +401,7 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
     "idx_api_usage_rollups_key_period": (
         "api_usage_rollups",
         ("key_id", "period", "period_start"),
->>>>>>> upstream/main
+        ("key_id", "period", "period_start"),
     ),
 }
 

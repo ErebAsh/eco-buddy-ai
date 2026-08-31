@@ -4,6 +4,7 @@ Migration to add feature flags and experiment tracking tables.
 import sqlite3
 
 def migrate(conn: sqlite3.Connection) -> None:
+    """Apply migration version 17: Add feature flags, api usage, rate limits, and data retention."""
     cursor = conn.cursor()
 
     # Create feature flags table
@@ -111,8 +112,21 @@ def migrate(conn: sqlite3.Connection) -> None:
     ''')
 
     conn.commit()
-    """Apply migration version 17: Add data retention and archival tables."""
     
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS api_rate_limits (
+            key_id INTEGER NOT NULL,
+            window_start INTEGER NOT NULL,
+            request_count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (key_id, window_start),
+            FOREIGN KEY (key_id) REFERENCES api_keys (id) ON DELETE CASCADE
+        );
+        """
+    )
+    
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_api_rate_limits_key_window ON api_rate_limits (key_id, window_start);")
+
     # Add deleted_at to users
     try:
         conn.execute("ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP")
@@ -191,10 +205,6 @@ def migrate(conn: sqlite3.Connection) -> None:
         """
     )
 
-    conn.commit()
-    """
-    Migration v17: Create domain_events table for EventStore audit log.
-    """
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -218,3 +228,5 @@ def migrate(conn: sqlite3.Connection) -> None:
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_domain_events_correlation ON domain_events(correlation_id)
     ''')
+    
+    conn.commit()
