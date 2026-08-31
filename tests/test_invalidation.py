@@ -19,16 +19,11 @@ from src.core.invalidation import (
     invalidate_on_appliance_change,
     invalidate_on_solar_config_save,
     invalidate_on_challenge_enroll,
-    invalidate_on_challenge_progress,
-    invalidate_on_challenge_complete,
     invalidate_on_xp_award,
     invalidate_on_badge_unlock,
     invalidate_on_skill_tree_update,
     invalidate_on_journey_save,
-    invalidate_on_journey_delete,
     invalidate_on_offset_save,
-    invalidate_on_offset_delete,
-    invalidate_on_offset_clear,
     invalidate_on_water_assessment_save,
     invalidate_all_db_caches,
     invalidate_export_caches,
@@ -46,7 +41,7 @@ class TestFunctionRegistration:
         # Add cache name attribute
         mock_func._cache_name = "mock_func"
         
-        from invalidation import register_cached_function
+        from src.core.invalidation import register_cached_function
         register_cached_function(mock_func, "test_category")
         
         assert "mock_func" in _CACHED_FUNCTION_REGISTRY
@@ -63,7 +58,7 @@ class TestFunctionRegistration:
             return "test2"
         mock_func2._cache_name = "mock_func2"
         
-        from invalidation import register_cached_function
+        from src.core.invalidation import register_cached_function
         register_cached_function(mock_func1, "db_reads")
         register_cached_function(mock_func2, "computed")
         
@@ -81,7 +76,7 @@ class TestFunctionRegistration:
             return "test2"
         mock_func2._cache_name = "mock_func2"
         
-        from invalidation import register_cached_function
+        from src.core.invalidation import register_cached_function
         register_cached_function(mock_func1, "category1")
         register_cached_function(mock_func2, "category2")
         
@@ -158,32 +153,6 @@ class TestInvalidateOnChallengeEnroll:
             assert 'get_user_challenges' in called_names
 
 
-class TestInvalidateOnChallengeProgress:
-    """Tests for invalidate_on_challenge_progress."""
-
-    def test_invalidate_challenge_progress(self):
-        """Test challenge progress update invalidates caches."""
-        with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_challenge_progress()
-            
-            mock_clear.assert_called_once()
-            called_names = mock_clear.call_args[0][0]
-            assert 'get_user_challenges' in called_names
-
-
-class TestInvalidateOnChallengeComplete:
-    """Tests for invalidate_on_challenge_complete."""
-
-    def test_invalidate_challenge_complete(self):
-        """Test challenge completion invalidates caches."""
-        with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_challenge_complete()
-            
-            mock_clear.assert_called_once()
-            called_names = mock_clear.call_args[0][0]
-            assert 'get_user_challenges' in called_names
-
-
 class TestInvalidateOnXpAward:
     """Tests for invalidate_on_xp_award."""
 
@@ -198,8 +167,9 @@ class TestInvalidateOnXpAward:
 
     def test_invalidate_xp_award_challenge_source(self):
         """Test XP award with challenge source invalidates challenge caches."""
+        from src.core.domain_events import XPAwarded
         with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_xp_award(source_type='challenge')
+            invalidate_on_xp_award(event=XPAwarded(source_type='challenge'))
             
             mock_clear.assert_called_once()
             called_names = mock_clear.call_args[0][0]
@@ -208,8 +178,9 @@ class TestInvalidateOnXpAward:
 
     def test_invalidate_xp_award_badge_source(self):
         """Test XP award with badge source invalidates badge caches."""
+        from src.core.domain_events import XPAwarded
         with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_xp_award(source_type='badge')
+            invalidate_on_xp_award(event=XPAwarded(source_type='badge'))
             
             mock_clear.assert_called_once()
             called_names = mock_clear.call_args[0][0]
@@ -257,19 +228,6 @@ class TestInvalidateOnJourneySave:
             assert 'get_journey_profiles' in called_names
 
 
-class TestInvalidateOnJourneyDelete:
-    """Tests for invalidate_on_journey_delete."""
-
-    def test_invalidate_journey_delete(self):
-        """Test journey delete invalidates journey caches."""
-        with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_journey_delete()
-            
-            mock_clear.assert_called_once()
-            called_names = mock_clear.call_args[0][0]
-            assert 'get_journey_profiles' in called_names
-
-
 class TestInvalidateOnOffsetSave:
     """Tests for invalidate_on_offset_save."""
 
@@ -277,36 +235,6 @@ class TestInvalidateOnOffsetSave:
         """Test offset save invalidates offset caches."""
         with patch('src.core.invalidation._clear_by_name') as mock_clear:
             invalidate_on_offset_save()
-            
-            mock_clear.assert_called_once()
-            called_names = mock_clear.call_args[0][0]
-            assert 'get_offset_transactions' in called_names
-            assert 'get_total_offsets' in called_names
-            assert 'get_total_spend' in called_names
-
-
-class TestInvalidateOnOffsetDelete:
-    """Tests for invalidate_on_offset_delete."""
-
-    def test_invalidate_offset_delete(self):
-        """Test offset delete invalidates offset caches."""
-        with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_offset_delete()
-            
-            mock_clear.assert_called_once()
-            called_names = mock_clear.call_args[0][0]
-            assert 'get_offset_transactions' in called_names
-            assert 'get_total_offsets' in called_names
-            assert 'get_total_spend' in called_names
-
-
-class TestInvalidateOnOffsetClear:
-    """Tests for invalidate_on_offset_clear."""
-
-    def test_invalidate_offset_clear(self):
-        """Test offset clear invalidates offset caches."""
-        with patch('src.core.invalidation._clear_by_name') as mock_clear:
-            invalidate_on_offset_clear()
             
             mock_clear.assert_called_once()
             called_names = mock_clear.call_args[0][0]
@@ -371,7 +299,7 @@ class TestClearByName:
 
     def test_clear_by_name_with_registry_hit(self):
         """Test clearing by name finds function in registry."""
-        from invalidation import register_cached_function, _clear_by_name
+        from src.core.invalidation import register_cached_function, _clear_by_name
         
         def mock_func():
             return "test"
@@ -386,7 +314,7 @@ class TestClearByName:
 
     def test_clear_by_name_with_fallback(self):
         """Test clearing by name falls back to module lookup."""
-        from invalidation import _clear_by_name
+        from src.core.invalidation import _clear_by_name
         
         # This test verifies fallback behavior exists
         # In practice, this would fail for non-existent functions
