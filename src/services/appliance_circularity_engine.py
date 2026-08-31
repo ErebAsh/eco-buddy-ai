@@ -4,7 +4,7 @@ Models the degradation of appliance energy efficiency over time and calculates t
 """
 
 from typing import Dict, Any, Optional
-from embodied_carbon_tracker import EmbodiedCarbonTracker
+from src.services.embodied_carbon_tracker import EmbodiedCarbonTracker
 
 
 class ApplianceCircularityEngine:

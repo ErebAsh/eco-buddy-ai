@@ -296,4 +296,37 @@ def generate_scenarios(
     limit = min(max_actions, len(action_ids))
 
     for size in range(1, limit + 1):
-        for combo in
+        for combo in itertools.combinations(action_ids, size):
+            full_combo = _expand_dependencies(set(combo))
+            if full_combo in seen:
+                continue
+            seen.add(full_combo)
+
+            if _has_conflict(full_combo):
+                continue
+
+            actions = [by_id[aid] for aid in full_combo]
+            scenario = engine._build_scenario(actions, category)
+            scenarios.append(scenario)
+
+    scenarios.sort(key=lambda s: s.total_reduction, reverse=True)
+    return scenarios[:10]
+
+RANK_BY_COST = "cost"
+RANK_BY_EFFORT = "effort"
+RANK_BY_REDUCTION = "reduction"
+
+def rank_scenarios(scenarios: list[ReductionScenario], by: str = RANK_BY_EFFORT, feasible_only: bool = True) -> list[ReductionScenario]:
+    if feasible_only:
+        scenarios = [s for s in scenarios if getattr(s, "feasible", True)]
+    if by == RANK_BY_EFFORT:
+        return sorted(scenarios, key=lambda s: s.total_effort)
+    elif by == RANK_BY_COST:
+        return sorted(scenarios, key=lambda s: getattr(s, "total_cost", 0))
+    elif by == RANK_BY_REDUCTION:
+        return sorted(scenarios, key=lambda s: s.total_reduction, reverse=True)
+    else:
+        raise ValueError(f"Unknown key: {by}")
+
+def reconcile_with_emissions_engine(*args, **kwargs):
+    pass

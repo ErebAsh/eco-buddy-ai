@@ -239,6 +239,35 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "lifetime_spent": "REAL",
         "updated_at": "TIMESTAMP",
     },
+    "api_usage_records": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "endpoint": "TEXT",
+        "method": "TEXT",
+        "status_code": "INTEGER",
+        "latency": "REAL",
+        "payload_size": "INTEGER",
+        "timestamp": "TEXT",
+    },
+    "api_usage_rollups": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "period": "TEXT",
+        "period_start": "TEXT",
+        "total_requests": "INTEGER",
+        "error_rate": "REAL",
+        "p50_latency": "REAL",
+        "p95_latency": "REAL",
+        "p99_latency": "REAL",
+        "created_at": "TEXT",
+    },
+    "api_billing_tiers": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "tier_name": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    },
 }
 
 EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
@@ -277,6 +306,14 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
     "idx_trades_buyer": (
         "credit_trades",
         ("buyer_id",),
+    ),
+    "idx_api_usage_key_id_timestamp": (
+        "api_usage_records",
+        ("key_id", "timestamp"),
+    ),
+    "idx_api_usage_rollups_key_period": (
+        "api_usage_rollups",
+        ("key_id", "period", "period_start"),
     ),
 }
 

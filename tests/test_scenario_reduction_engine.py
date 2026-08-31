@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from scenario_reduction_engine import (
+from src.services.scenario_reduction_engine import (
     CATEGORY_REDUCTION_CEILINGS,
     MEASURED_SOURCE,
     PROJECTION_SOURCE,

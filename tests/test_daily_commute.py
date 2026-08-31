@@ -3,8 +3,8 @@ Unit tests for Daily Commute Optimizer and Transit Carbon Tracker.
 """
 
 import pytest
-from daily_commute_optimizer import DailyCommuteOptimizer
-from transit_carbon_tracker import TransitCarbonTracker
+from src.services.daily_commute_optimizer import DailyCommuteOptimizer
+from src.services.transit_carbon_tracker import TransitCarbonTracker
 
 
 def test_optimizer_evaluation():
