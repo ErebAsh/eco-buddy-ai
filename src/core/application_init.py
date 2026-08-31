@@ -14,6 +14,11 @@ from .startup_decorators import (
     retry_on_failure
 )
 
+from .event_subscribers import register_all_subscribers
+
+# Register event subscribers on application init
+register_all_subscribers()
+
 __all__ = [
     'StartupOptimizer',
     'LoadPriority',
