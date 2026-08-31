@@ -239,6 +239,11 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "lifetime_spent": "REAL",
         "updated_at": "TIMESTAMP",
     },
+    "api_rate_limits": {
+        "key_id": "INTEGER",
+        "window_start": "INTEGER",
+        "request_count": "INTEGER",
+    },
 }
 
 EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
@@ -277,6 +282,10 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
     "idx_trades_buyer": (
         "credit_trades",
         ("buyer_id",),
+    ),
+    "idx_api_rate_limits_key_window": (
+        "api_rate_limits",
+        ("key_id", "window_start"),
     ),
 }
 
