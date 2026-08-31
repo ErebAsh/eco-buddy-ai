@@ -3,8 +3,8 @@ Unit tests for Skill Swap Engine and Knowledge Marketplace.
 """
 
 import pytest
-from skill_swap_engine import SkillSwapEngine
-from knowledge_marketplace import KnowledgeMarketplace
+from src.services.skill_swap_engine import SkillSwapEngine
+from src.services.knowledge_marketplace import KnowledgeMarketplace
 
 
 def test_engine_user_registration():

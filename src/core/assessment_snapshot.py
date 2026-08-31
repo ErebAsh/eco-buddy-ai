@@ -37,7 +37,8 @@ def build_assessment_snapshot(
     total: float,
     eco_score: int,
     uncertainty_range: dict[str, Any] | None = None,
-) -> dict[str, Any]:     """
+) -> dict[str, Any]:
+    """
     Freeze everything needed to reproduce an assessment later:
 
     - the original normalized user inputs

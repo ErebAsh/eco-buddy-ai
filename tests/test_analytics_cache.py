@@ -5,7 +5,7 @@ Tests caching behavior, expiration, edge cases, and decorator usage.
 
 import time
 import pytest
-from analytics_cache import TTLCache, cached, cache_analytics_data, get_cached_analytics_data
+from src.utils.analytics_cache import TTLCache, cached, cache_analytics_data, get_cached_analytics_data
 
 
 # ==============================================================================

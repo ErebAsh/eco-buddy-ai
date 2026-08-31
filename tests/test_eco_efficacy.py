@@ -3,8 +3,8 @@ Unit tests for Eco-Efficacy Tracker and Micro-Action Therapy.
 """
 
 import pytest
-from eco_efficacy_tracker import EcoEfficacyTracker
-from micro_action_therapy import MicroActionTherapy
+from src.services.eco_efficacy_tracker import EcoEfficacyTracker
+from src.services.micro_action_therapy import MicroActionTherapy
 
 
 def test_tracker_score_calculation():

@@ -246,6 +246,35 @@ EXPECTED_TABLES: Mapping[str, Mapping[str, str]] = {
         "window_start": "INTEGER",
         "request_count": "INTEGER",
     },
+    "api_usage_records": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "endpoint": "TEXT",
+        "method": "TEXT",
+        "status_code": "INTEGER",
+        "latency": "REAL",
+        "payload_size": "INTEGER",
+        "timestamp": "TEXT",
+    },
+    "api_usage_rollups": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "period": "TEXT",
+        "period_start": "TEXT",
+        "total_requests": "INTEGER",
+        "error_rate": "REAL",
+        "p50_latency": "REAL",
+        "p95_latency": "REAL",
+        "p99_latency": "REAL",
+        "created_at": "TEXT",
+    },
+    "api_billing_tiers": {
+        "id": "INTEGER",
+        "key_id": "TEXT",
+        "tier_name": "TEXT",
+        "created_at": "TEXT",
+        "updated_at": "TEXT",
+    },
     "users_archive": {
         "id": "INTEGER",
         "username": "TEXT",
@@ -328,6 +357,14 @@ EXPECTED_INDEXES: Mapping[str, tuple[str, tuple[str, ...]]] = {
     "idx_api_rate_limits_key_window": (
         "api_rate_limits",
         ("key_id", "window_start"),
+    ),
+    "idx_api_usage_key_id_timestamp": (
+        "api_usage_records",
+        ("key_id", "timestamp"),
+    ),
+    "idx_api_usage_rollups_key_period": (
+        "api_usage_rollups",
+        ("key_id", "period", "period_start"),
     ),
 }
 

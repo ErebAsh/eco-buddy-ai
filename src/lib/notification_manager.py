@@ -685,3 +685,13 @@ def mark_all_as_read(user_id: int) -> int:
     """Convenience function to mark all notifications as read."""
     manager = get_notification_manager()
     return manager.mark_all_as_read(user_id)
+
+def dismiss_notification(user_id: int, notification_id: str) -> bool:
+    """Convenience function to dismiss a notification."""
+    manager = get_notification_manager()
+    return manager.dismiss_notification(user_id, notification_id)
+
+def dismiss_all(user_id: int) -> int:
+    """Convenience function to dismiss all notifications."""
+    manager = get_notification_manager()
+    return manager.dismiss_all(user_id)

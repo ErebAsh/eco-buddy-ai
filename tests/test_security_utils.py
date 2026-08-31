@@ -4,7 +4,7 @@ Tests XSS prevention, SQL injection prevention, and edge cases.
 """
 
 import pytest
-from security_utils import sanitize_html, sanitize_sql, sanitize_user_input
+from src.utils.security_utils import sanitize_html, sanitize_sql, sanitize_user_input
 
 
 # ==============================================================================
