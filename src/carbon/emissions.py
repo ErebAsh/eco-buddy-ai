@@ -124,7 +124,8 @@ def calculate_category_emissions(transport: str, distance: float, electricity: f
                                  flights: int,
                                  dynamic_factors: dict[str, Any],
                                  confidence_tracker: Any = None,
-                                 lineage_builder: Any = None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:    """
+                                 lineage_builder: Any = None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """
     Calculates carbon emissions per activity category (Transport, Electricity, Diet, Flights).
 
     Returns:

@@ -6,6 +6,7 @@ using simplified wind-driven Ekman transport and Coriolis force.
 
 import numpy as np
 import math
+from typing import Tuple
 from plugins.ocean_current.world_map import WorldMapGrid
 
 class OceanCurrentSolver:

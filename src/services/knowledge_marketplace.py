@@ -4,7 +4,7 @@ Curates and displays available skill offerings, complete with categories, diffic
 """
 
 from typing import Dict, Any, List
-from skill_swap_engine import SkillSwapEngine
+from src.services.skill_swap_engine import SkillSwapEngine
 
 
 class KnowledgeMarketplace:

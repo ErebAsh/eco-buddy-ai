@@ -27,7 +27,8 @@ def make_db(path: Path):
         """
     )
     conn.execute("INSERT INTO users VALUES (1,'alice','alice@example.com','SECRET',0,'2026-01-01T00:00:00Z')")
-    conn.execute("INSERT INTO assessments VALUES (1,1,'2026-01-02T00:00:00Z','2026-01-02T00:00:00Z','2026-01-02T00:00:00Z',NULL,NULL,'Bike',5,100,'Vegetarian',0,120,90,'trip-1')")    conn.execute("INSERT INTO reduction_goals VALUES (1,1,500,350,'2026-01-01','2026-12-31','active','2026-01-01T00:00:00Z')")
+    conn.execute("INSERT INTO assessments VALUES (1,1,'2026-01-02T00:00:00Z','2026-01-02T00:00:00Z','2026-01-02T00:00:00Z',NULL,NULL,'Bike',5,100,'Vegetarian',0,120,90,'trip-1')")
+    conn.execute("INSERT INTO reduction_goals VALUES (1,1,500,350,'2026-01-01','2026-12-31','active','2026-01-01T00:00:00Z')")
     conn.execute("INSERT INTO user_habits VALUES (1,?, '2026-01-03T00:00:00Z')", (json.dumps({'active_habits':['Walk for short trips']}),))
     conn.execute("INSERT INTO recommendation_feedback VALUES (1,1,'rec-1','Transport','helpful','easy','2026-01-04T00:00:00Z')")
     conn.commit(); conn.close()
@@ -124,7 +125,11 @@ def test_supported_fields_only_and_no_external_dependency(tmp_path):
 
 def test_large_history(tmp_path):
     db=tmp_path/'eco.db'; make_db(db); conn=sqlite3.connect(db)
-    for i in range(2,502): conn.execute('INSERT INTO assessments VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,1,f'2026-01-01T00:00:00Z',f'2026-01-01T00:00:00Z',f'2026-01-01T00:00:00Z',None,None,'Walk',i,100,'Vegan',0,10,95,str(i)))    conn.commit(); conn.close(); assert len(export_profile(1,str(db))['assessments'])==501
+    for i in range(2,502):
+        conn.execute('INSERT INTO assessments VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(i,1,f'2026-01-01T00:00:00Z',f'2026-01-01T00:00:00Z',f'2026-01-01T00:00:00Z',None,None,'Walk',i,100,'Vegan',0,10,95,str(i)))
+    conn.commit(); conn.close(); assert len(export_profile(1,str(db))['assessments'])==501
+
+
 def _add_stable_assessment(db, client_uuid, updated_at, eco_score=70, row_id=50, trip_id='trip-stable'):
     conn = sqlite3.connect(db)
     conn.execute(

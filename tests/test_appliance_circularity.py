@@ -3,8 +3,8 @@ Unit tests for Appliance Circularity Engine and Embodied Carbon Tracker.
 """
 
 import pytest
-from appliance_circularity_engine import ApplianceCircularityEngine
-from embodied_carbon_tracker import EmbodiedCarbonTracker
+from src.services.appliance_circularity_engine import ApplianceCircularityEngine
+from src.services.embodied_carbon_tracker import EmbodiedCarbonTracker
 
 
 def test_tracker_retrieval():
